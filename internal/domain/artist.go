@@ -31,6 +31,8 @@ func (a *Artist) Validate() []string {
 	return errors
 }
 
+// CreateSlug creates a url-safe version of the artist title.
+// Entry argument used for auto-append.
 func (a *Artist) CreateSlug(entropy string) string {
 	strs := []string{a.Name, entropy}
 	str := strings.Join(strs, " ")

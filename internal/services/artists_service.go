@@ -4,16 +4,18 @@ import (
 	"context"
 	"errors"
 	"setmaker-api-go-rest/internal/domain"
+	"setmaker-api-go-rest/internal/utils"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/pborman/uuid"
 )
 
-const Table = "artists"
+const Table = "artists" // DB table
 
 type ArtistService struct {
 	db    *mongo.Database
@@ -27,6 +29,43 @@ func NewArtistsService(db *mongo.Database) *ArtistService {
 		db:    db,
 		table: Table,
 	}
+}
+
+func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, error) {
+	var artists []*domain.Artist
+	ctx := context.TODO()
+
+	// filter options
+	opts := options.Find()
+	opts.SetSort(bson.D{{Key: filter.Field, Value: filter.Operator}})
+
+	// fetch results
+	res, err := svc.db.Collection(svc.table).Find(ctx, bson.D{}, opts)
+	if err != nil {
+		log.Error(err)
+		return artists, err
+	}
+
+	defer res.Close(ctx) // close conn
+
+	// loop cursor
+	for res.Next(ctx) {
+		var a domain.Artist
+		err := res.Decode(&a)
+		if err != nil {
+			log.Error(err)
+			return artists, err
+		}
+
+		artists = append(artists, &a)
+	}
+
+	if err := res.Err(); err != nil {
+		log.Error(err)
+		return artists, err
+	}
+
+	return artists, nil
 }
 
 func (svc *ArtistService) CreateArtist(artist *domain.Artist) (bool, error) {
