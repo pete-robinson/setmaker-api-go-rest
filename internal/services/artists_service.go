@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 )
 
 const Table = "artists" // DB table
@@ -32,7 +32,7 @@ func NewArtistsService(db *mongo.Database) *ArtistService {
 }
 
 func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, error) {
-	var artists []*domain.Artist
+	artists := make([]*domain.Artist, 0)
 	ctx := context.TODO()
 
 	// filter options
@@ -60,39 +60,49 @@ func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist,
 		artists = append(artists, &a)
 	}
 
-	if err := res.Err(); err != nil {
-		log.Error(err)
-		return artists, err
-	}
-
 	return artists, nil
 }
 
-func (svc *ArtistService) CreateArtist(artist *domain.Artist) (bool, error) {
+func (svc *ArtistService) CreateArtist(artist *domain.Artist) error {
 	// set new id
-	artist.ID = uuid.NewUUID()
+	id := uuid.New()
+
+	// ID created = set artist id
+	artist.ID = id
 
 	// create unique slug
 	err := svc.uniqueSlug(artist)
 	if err != nil {
 		log.Error("Error generating URL slug")
-		return false, err
+		return err
 	}
 
 	// validate
-	if err := artist.Validate(); len(err) > 0 {
-		log.Error("Validation error", err)
-		return false, errors.New(err[0]) // hacky but it'll do until i build a more robust abstraction for error mgmt
+	if errStr := artist.Validate(); len(errStr) > 0 {
+		log.Error("Validation error", errStr)
+		return errors.New(errStr[0]) // hacky but it'll do until i build a more robust abstraction for error mgmt
 	}
 
-	res, err := svc.db.Collection(svc.table).InsertOne(context.TODO(), artist)
-	_ = res // dumping to keep the linting happy
+	_, err = svc.db.Collection(svc.table).InsertOne(context.TODO(), artist)
 	if err != nil {
 		log.Error("Mongo error:", err)
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
+}
+
+func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, error) {
+	var a *domain.Artist
+
+	err := svc.db.Collection(svc.table).FindOne(context.TODO(), bson.M{"_id": id}).Decode(&a)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	return a, nil
+
 }
 
 func (svc *ArtistService) uniqueSlug(a *domain.Artist) error {

@@ -4,16 +4,16 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/gosimple/slug"
-	"github.com/pborman/uuid"
 )
 
 type Artist struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Slug  string    `json:"slug"`
-	Image string    `json:"image"`
-	Songs *[]Song   `json:"songs"`
+	ID    uuid.UUID `bson:"_id" json:"id"`
+	Name  string    `bson:"name" json:"name"`
+	Slug  string    `bson:"slug" json:"slug"`
+	Image string    `bson:"image" json:"image"`
+	Songs *[]Song   `bson:"songs" json:"songs"`
 }
 
 func (a *Artist) Validate() []string {
