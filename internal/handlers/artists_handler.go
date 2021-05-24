@@ -46,6 +46,12 @@ func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 		resp, err = s.getArtist(r)
 		successCode = 200
 		break
+	case "updateArtist":
+		resp, err = s.updateArtist(r)
+		successCode = 200
+	case "deleteArtist":
+		resp, err = s.deleteArtist(r)
+		successCode = 200
 	default:
 		fmt.Println("no")
 		break
@@ -70,22 +76,6 @@ func (s *Handler) getArtists(r *http.Request) (interface{}, e.AppError) {
 	return artists, nil
 }
 
-func (s *Handler) createArtist(r *http.Request) (interface{}, e.AppError) {
-	var a *domain.Artist
-
-	err := json.NewDecoder(r.Body).Decode(&a)
-	if err != nil {
-		log.Error(err)
-		return nil, e.NewInternalServerError("An internal error occurred", err)
-	}
-
-	if err := s.svc.CreateArtist(a); err != nil {
-		return nil, e.NewBadRequest("Bad Request", err)
-	}
-
-	return a, nil
-}
-
 func (s *Handler) getArtist(r *http.Request) (interface{}, e.AppError) {
 	idb := mux.Vars(r)["id"]
 	id, err := uuid.Parse(idb)
@@ -100,4 +90,57 @@ func (s *Handler) getArtist(r *http.Request) (interface{}, e.AppError) {
 	}
 
 	return artist, nil
+}
+
+func (s *Handler) createArtist(r *http.Request) (interface{}, e.AppError) {
+	var a *domain.Artist
+
+	err := json.NewDecoder(r.Body).Decode(&a)
+	if err != nil {
+		log.Error(err)
+		return nil, e.NewBadRequest("Invalid request", err)
+	}
+
+	if err := s.svc.CreateArtist(a); err != nil {
+		return nil, e.NewBadRequest("Bad Request", err)
+	}
+
+	return a, nil
+}
+
+func (s *Handler) updateArtist(r *http.Request) (interface{}, e.AppError) {
+	var a *domain.Artist
+	idb := mux.Vars(r)["id"]
+	id, err := uuid.Parse(idb)
+	if err != nil {
+		return nil, e.NewBadRequest("Invalid request", err)
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&a)
+	if err != nil {
+		log.Error(err)
+		return nil, e.NewBadRequest("Invalid request", err)
+	}
+
+	if err := s.svc.UpdateArtist(a, id); err != nil {
+		return nil, e.NewBadRequest("Bad request", err)
+	}
+
+	return a, nil
+}
+
+func (s *Handler) deleteArtist(r *http.Request) (interface{}, e.AppError) {
+	idb := mux.Vars(r)["id"]
+	id, err := uuid.Parse(idb)
+	if err != nil {
+		return nil, e.NewBadRequest("Invalid request", err)
+	}
+
+	artist, err := s.svc.DeleteArtist(id)
+	if err != nil {
+		return nil, e.NewBadRequest("Bad request", err)
+	}
+
+	return artist, nil
+
 }

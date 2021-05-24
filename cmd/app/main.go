@@ -6,6 +6,7 @@ import (
 
 	mdb "setmaker-api-go-rest/internal/database"
 	"setmaker-api-go-rest/internal/handlers"
+	"setmaker-api-go-rest/internal/repository"
 	"setmaker-api-go-rest/internal/router"
 	"setmaker-api-go-rest/internal/services"
 
@@ -23,8 +24,11 @@ func main() {
 		panic(err)
 	}
 
+	// register repository
+	artistsRepository := repository.NewArtistsRepository(db)
+
 	// register services
-	artistsService := services.NewArtistsService(db)
+	artistsService := services.NewArtistsService(artistsRepository)
 
 	// register controllers
 	controllers := map[string]router.RouteHandler{

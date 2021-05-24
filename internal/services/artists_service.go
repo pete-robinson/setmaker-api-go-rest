@@ -1,75 +1,38 @@
 package services
 
 import (
-	"context"
 	"errors"
 	"setmaker-api-go-rest/internal/domain"
+	"setmaker-api-go-rest/internal/repository"
 	"setmaker-api-go-rest/internal/utils"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/google/uuid"
 )
 
-const Table = "artists" // DB table
-
 type ArtistService struct {
-	db    *mongo.Database
-	table string
+	repository *repository.ArtistsRepository
 }
 
 type ValidatorResponse map[string][]string
 
-func NewArtistsService(db *mongo.Database) *ArtistService {
+func NewArtistsService(r *repository.ArtistsRepository) *ArtistService {
 	return &ArtistService{
-		db:    db,
-		table: Table,
+		repository: r,
 	}
 }
 
 func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, error) {
-	artists := make([]*domain.Artist, 0)
-	ctx := context.TODO()
+	return svc.repository.Find(filter)
+}
 
-	// filter options
-	opts := options.Find()
-	opts.SetSort(bson.D{{Key: filter.Field, Value: filter.Operator}})
-
-	// fetch results
-	res, err := svc.db.Collection(svc.table).Find(ctx, bson.D{}, opts)
-	if err != nil {
-		log.Error(err)
-		return artists, err
-	}
-
-	defer res.Close(ctx) // close conn
-
-	// loop cursor
-	for res.Next(ctx) {
-		var a domain.Artist
-		err := res.Decode(&a)
-		if err != nil {
-			log.Error(err)
-			return artists, err
-		}
-
-		artists = append(artists, &a)
-	}
-
-	return artists, nil
+func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, error) {
+	return svc.repository.Get(id)
 }
 
 func (svc *ArtistService) CreateArtist(artist *domain.Artist) error {
-	// set new id
-	id := uuid.New()
-
-	// ID created = set artist id
-	artist.ID = id
-
 	// create unique slug
 	err := svc.uniqueSlug(artist)
 	if err != nil {
@@ -80,10 +43,11 @@ func (svc *ArtistService) CreateArtist(artist *domain.Artist) error {
 	// validate
 	if errStr := artist.Validate(); len(errStr) > 0 {
 		log.Error("Validation error", errStr)
-		return errors.New(errStr[0]) // hacky but it'll do until i build a more robust abstraction for error mgmt
+		return errors.New(errStr[0]) // hacky but it'll do until i build a more robust error abstraction
 	}
 
-	_, err = svc.db.Collection(svc.table).InsertOne(context.TODO(), artist)
+	// create artist
+	err = svc.repository.Create(artist)
 	if err != nil {
 		log.Error("Mongo error:", err)
 		return err
@@ -92,21 +56,55 @@ func (svc *ArtistService) CreateArtist(artist *domain.Artist) error {
 	return nil
 }
 
-func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, error) {
-	var a *domain.Artist
+func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) error {
+	a.ID = id
 
-	err := svc.db.Collection(svc.table).FindOne(context.TODO(), bson.M{"_id": id}).Decode(&a)
+	originalArtist, err := svc.repository.Get(id)
 	if err != nil {
 		log.Error(err)
+		return err
+	}
+
+	if originalArtist == nil {
+		e := errors.New("Artist was not found")
+		log.Error(e)
+		return e
+	}
+
+	if a.Name != originalArtist.Name {
+		err := svc.uniqueSlug(a)
+		if err != nil {
+			return err
+		}
+	} else {
+		a.Slug = originalArtist.Slug
+	}
+
+	if errStr := a.Validate(); len(errStr) > 0 {
+		log.Error("Validation error", errStr)
+		return errors.New(errStr[0])
+	}
+
+	return svc.repository.Update(a)
+}
+
+func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, error) {
+	// check the artist exists
+	artist, err := svc.GetArtist(id)
+	if artist == nil || err != nil {
+		return nil, errors.New("Artist not found")
+	}
+
+	err = svc.repository.Delete(artist)
+	if err != nil {
 		return nil, err
 	}
 
-	return a, nil
-
+	return artist, nil
 }
 
 func (svc *ArtistService) uniqueSlug(a *domain.Artist) error {
-	// loop through up to 10 times to create a unique slug
+	// loop through up to n times to create a unique slug
 	var s string
 	for i := 0; i < 20; i++ {
 		if i == 0 {
@@ -117,7 +115,12 @@ func (svc *ArtistService) uniqueSlug(a *domain.Artist) error {
 		}
 
 		// call DB to see if slug is unique
-		count, err := svc.db.Collection(svc.table).CountDocuments(context.TODO(), bson.M{"slug": s})
+		fs := utils.FieldSearch{
+			Field: "slug",
+			Query: s,
+		}
+
+		count, err := svc.repository.Count(fs)
 		if err != nil {
 			return err
 		}

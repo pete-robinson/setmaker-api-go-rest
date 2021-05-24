@@ -9,7 +9,7 @@ import (
 )
 
 type Artist struct {
-	ID    uuid.UUID `bson:"_id" json:"id"`
+	ID    uuid.UUID `bson:"_id,omitempty" json:"id,omitempty"`
 	Name  string    `bson:"name" json:"name"`
 	Slug  string    `bson:"slug" json:"slug"`
 	Image string    `bson:"image" json:"image"`
