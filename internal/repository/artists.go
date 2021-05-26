@@ -44,8 +44,8 @@ func (r *ArtistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
 
 	found := r.db.Collection(r.table).FindOne(ctx, bson.M{"_id": id})
 	if found == nil {
-		log.Error(fmt.Sprintf("Artist %s not found", id))
-		return nil, errors.New("Artist not found")
+		log.Error(fmt.Sprintf("Artist %q not found", id))
+		return a, errors.New("Artist not found")
 	}
 
 	found.Decode(&a)
@@ -127,15 +127,6 @@ func (r *ArtistsRepository) Update(a *domain.Artist) error {
 func (r *ArtistsRepository) Delete(a *domain.Artist) error {
 	ctx := context.Background()
 
-	res, err := r.db.Collection(r.table).DeleteOne(ctx, bson.M{"_id": a.ID})
-	fmt.Println(res)
+	_, err := r.db.Collection(r.table).DeleteOne(ctx, bson.M{"_id": a.ID})
 	return err
 }
-
-// func (r *artistsRepository) Update(*domain.Artist) error {
-
-// }
-
-// func (r *artistsRepository) Delete(*domain.Artist) error {
-
-// }

@@ -2,9 +2,11 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"setmaker-api-go-rest/internal/domain"
 	"setmaker-api-go-rest/internal/repository"
 	"setmaker-api-go-rest/internal/utils"
+	ae "setmaker-api-go-rest/internal/utils/errors"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -24,57 +26,74 @@ func NewArtistsService(r *repository.ArtistsRepository) *ArtistService {
 	}
 }
 
-func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, error) {
-	return svc.repository.Find(filter)
+func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, *ae.AppError) {
+	res, err := svc.repository.Find(filter)
+	if err != nil {
+		return nil, ae.MakeError(ae.ERRInternalServerError, "Error fetching artists")
+	}
+
+	if res != nil {
+		return res, nil
+	}
+
+	return nil, ae.MakeError(ae.ERRNotFound, "No artists found")
 }
 
-func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, error) {
-	return svc.repository.Get(id)
+func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
+	artist, err := svc.repository.Get(id)
+	if err != nil {
+		return nil, ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Artist %q not found", id))
+	}
+
+	if artist != nil {
+		return artist, nil
+	}
+
+	return nil, ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Artist %q not found", id))
 }
 
-func (svc *ArtistService) CreateArtist(artist *domain.Artist) error {
+func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
 	// create unique slug
 	err := svc.uniqueSlug(artist)
 	if err != nil {
 		log.Error("Error generating URL slug")
-		return err
+		return ae.MakeError(ae.ERRInternalServerError, "Could not create artist path")
 	}
 
 	// validate
 	if errStr := artist.Validate(); len(errStr) > 0 {
 		log.Error("Validation error", errStr)
-		return errors.New(errStr[0]) // hacky but it'll do until i build a more robust error abstraction
+		return ae.MakeError(ae.ERRBadRequest, errStr) // hacky but it'll do until i build a more robust error abstraction
 	}
 
 	// create artist
 	err = svc.repository.Create(artist)
 	if err != nil {
 		log.Error("Mongo error:", err)
-		return err
+		return ae.MakeError(ae.ERRInternalServerError, "Could not create artist")
 	}
 
 	return nil
 }
 
-func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) error {
+func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppError {
 	a.ID = id
 
 	originalArtist, err := svc.repository.Get(id)
 	if err != nil {
 		log.Error(err)
-		return err
+		return ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Error fetching artist to update: %q", id))
 	}
 
 	if originalArtist == nil {
-		e := errors.New("Artist was not found")
-		log.Error(e)
-		return e
+		log.Errorf("Artist %q was not found", id)
+		return ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Artist %q not found", id))
 	}
 
 	if a.Name != originalArtist.Name {
 		err := svc.uniqueSlug(a)
 		if err != nil {
-			return err
+			return ae.MakeError(ae.ERRInternalServerError, "Could not create artist path")
 		}
 	} else {
 		a.Slug = originalArtist.Slug
@@ -82,22 +101,28 @@ func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) error {
 
 	if errStr := a.Validate(); len(errStr) > 0 {
 		log.Error("Validation error", errStr)
-		return errors.New(errStr[0])
+		return ae.MakeError(ae.ERRBadRequest, errStr)
 	}
 
-	return svc.repository.Update(a)
+	err = svc.repository.Update(a)
+	if err != nil {
+		return ae.MakeError(ae.ERRBadRequest, fmt.Sprintf("Error persisting artist update: %q", id))
+	}
+
+	return nil
 }
 
-func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, error) {
+func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
 	// check the artist exists
 	artist, err := svc.GetArtist(id)
 	if artist == nil || err != nil {
-		return nil, errors.New("Artist not found")
+		log.Error(err)
+		return nil, err
 	}
 
-	err = svc.repository.Delete(artist)
-	if err != nil {
-		return nil, err
+	e := svc.repository.Delete(artist)
+	if e != nil {
+		return nil, ae.MakeError(ae.ERRInternalServerError, fmt.Sprintf("Artist could not be deleted: %q", id))
 	}
 
 	return artist, nil

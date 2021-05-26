@@ -7,7 +7,7 @@ import (
 	"setmaker-api-go-rest/internal/domain"
 	"setmaker-api-go-rest/internal/services"
 	"setmaker-api-go-rest/internal/utils"
-	e "setmaker-api-go-rest/internal/utils/errors"
+	ae "setmaker-api-go-rest/internal/utils/errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -31,7 +31,7 @@ func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 	route := mux.CurrentRoute(r).GetName()
 	var successCode int
 	var resp interface{}
-	var err e.AppError
+	var err *ae.AppError
 
 	switch route {
 	case "createArtist":
@@ -53,92 +53,97 @@ func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 		resp, err = s.deleteArtist(r)
 		successCode = 200
 	default:
-		fmt.Println("no")
+		err = ae.MakeError(ae.ERRNotFound, "Route not found")
 		break
 	}
 
 	if err != nil {
-		utils.JsonResponse(w, err.GetCode(), err.GetPayload())
+		utils.JsonResponse(w, err.GetCode(), err)
 	} else {
 		utils.JsonResponse(w, successCode, resp)
 	}
 }
 
-func (s *Handler) getArtists(r *http.Request) (interface{}, e.AppError) {
-	sort := utils.FetchSortParams(r, "name", 1)
+func (s *Handler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
+	sort, e := utils.FetchSortParams(r, "name", 1)
+	if e != nil {
+		return nil, ae.MakeError(ae.ERRBadRequest, e)
+	}
 
 	artists, err := s.svc.GetArtists(sort)
 	if err != nil {
 		log.Error(err)
-		return nil, e.NewInternalServerError("An internal error occurred", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, err)
 	}
 
 	return artists, nil
 }
 
-func (s *Handler) getArtist(r *http.Request) (interface{}, e.AppError) {
+func (s *Handler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
 	idb := mux.Vars(r)["id"]
-	id, err := uuid.Parse(idb)
-	if err != nil {
-		log.Error(err)
-		return nil, e.NewBadRequest("Bad Request", "Invalid ID provided")
+	id, e := uuid.Parse(idb)
+	if e != nil {
+		log.Error(e)
+		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid ID")
 	}
 
 	var artist *domain.Artist
-	if artist, err = s.svc.GetArtist(id); err != nil {
-		return nil, e.NewNotFound(fmt.Sprintf("Artist %s not found", id), err)
+	artist, err := s.svc.GetArtist(id)
+	if err != nil {
+		fmt.Println("sss")
+		return nil, err
 	}
 
 	return artist, nil
 }
 
-func (s *Handler) createArtist(r *http.Request) (interface{}, e.AppError) {
+func (s *Handler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
 	var a *domain.Artist
 
 	err := json.NewDecoder(r.Body).Decode(&a)
 	if err != nil {
 		log.Error(err)
-		return nil, e.NewBadRequest("Invalid request", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid request body")
 	}
 
 	if err := s.svc.CreateArtist(a); err != nil {
-		return nil, e.NewBadRequest("Bad Request", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, err)
 	}
 
 	return a, nil
 }
 
-func (s *Handler) updateArtist(r *http.Request) (interface{}, e.AppError) {
+func (s *Handler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
 	var a *domain.Artist
 	idb := mux.Vars(r)["id"]
 	id, err := uuid.Parse(idb)
 	if err != nil {
-		return nil, e.NewBadRequest("Invalid request", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid ID")
 	}
 
 	err = json.NewDecoder(r.Body).Decode(&a)
 	if err != nil {
 		log.Error(err)
-		return nil, e.NewBadRequest("Invalid request", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid request body")
 	}
 
 	if err := s.svc.UpdateArtist(a, id); err != nil {
-		return nil, e.NewBadRequest("Bad request", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, err)
 	}
 
 	return a, nil
 }
 
-func (s *Handler) deleteArtist(r *http.Request) (interface{}, e.AppError) {
+func (s *Handler) deleteArtist(r *http.Request) (interface{}, *ae.AppError) {
 	idb := mux.Vars(r)["id"]
-	id, err := uuid.Parse(idb)
-	if err != nil {
-		return nil, e.NewBadRequest("Invalid request", err)
+	id, e := uuid.Parse(idb)
+	if e != nil {
+		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid ID")
 	}
 
 	artist, err := s.svc.DeleteArtist(id)
 	if err != nil {
-		return nil, e.NewBadRequest("Bad request", err)
+		return nil, ae.MakeError(ae.ERRBadRequest, err)
 	}
 
 	return artist, nil
