@@ -42,14 +42,10 @@ func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist,
 func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
 	artist, err := svc.repository.Get(id)
 	if err != nil {
-		return nil, ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Artist %q not found", id))
+		return nil, ae.MakeError(ae.ERRNotFound, err.Error())
 	}
 
-	if artist != nil {
-		return artist, nil
-	}
-
-	return nil, ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Artist %q not found", id))
+	return artist, nil
 }
 
 func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
@@ -77,35 +73,33 @@ func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
 }
 
 func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppError {
-	a.ID = id
-
-	originalArtist, err := svc.repository.Get(id)
+	// check the original artist actually exists
+	originalArtist, err := svc.GetArtist(id)
 	if err != nil {
-		log.Error(err)
-		return ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Error fetching artist to update: %q", id))
+		return err
 	}
 
-	if originalArtist == nil {
-		log.Errorf("Artist %q was not found", id)
-		return ae.MakeError(ae.ERRNotFound, fmt.Sprintf("Artist %q not found", id))
-	}
+	a.ID = id // append ID to artist struct
 
+	// if name is different, the slug will need to changes
 	if a.Name != originalArtist.Name {
 		err := svc.uniqueSlug(a)
 		if err != nil {
 			return ae.MakeError(ae.ERRInternalServerError, "Could not create artist path")
 		}
 	} else {
+		// set slug - this doesn't come via the request
 		a.Slug = originalArtist.Slug
 	}
 
+	// validate the artist struct
 	if errStr := a.Validate(); len(errStr) > 0 {
 		log.Error("Validation error", errStr)
 		return ae.MakeError(ae.ERRBadRequest, errStr)
 	}
 
-	err = svc.repository.Update(a)
-	if err != nil {
+	e := svc.repository.Update(a)
+	if e != nil {
 		return ae.MakeError(ae.ERRBadRequest, fmt.Sprintf("Error persisting artist update: %q", id))
 	}
 
@@ -115,7 +109,7 @@ func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppEr
 func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
 	// check the artist exists
 	artist, err := svc.GetArtist(id)
-	if artist == nil || err != nil {
+	if err != nil {
 		log.Error(err)
 		return nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/gosimple/slug"
 )
 
+// core struct
 type Artist struct {
 	ID    uuid.UUID `bson:"_id,omitempty" json:"id,omitempty"`
 	Name  string    `bson:"name" json:"name"`
@@ -16,6 +17,8 @@ type Artist struct {
 	Songs *[]Song   `bson:"songs" json:"songs"`
 }
 
+// simple struct validation
+// @todo use a library to validate this better
 func (a *Artist) Validate() []string {
 	var errors []string
 	a.Name = strings.TrimSpace(a.Name)
@@ -32,7 +35,7 @@ func (a *Artist) Validate() []string {
 }
 
 // CreateSlug creates a url-safe version of the artist title.
-// Entry argument used for auto-append.
+// Entropy argument used for auto-append.
 func (a *Artist) CreateSlug(entropy string) string {
 	strs := []string{a.Name, entropy}
 	str := strings.Join(strs, " ")

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"setmaker-api-go-rest/internal/domain"
 	"setmaker-api-go-rest/internal/services"
@@ -28,10 +27,10 @@ func NewArtistsHandler(svc *services.ArtistService) *Handler {
 }
 
 func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
-	route := mux.CurrentRoute(r).GetName()
-	var successCode int
-	var resp interface{}
-	var err *ae.AppError
+	route := mux.CurrentRoute(r).GetName() // current requested route
+	var successCode int                    // init success code
+	var resp interface{}                   // init response interface
+	var err *ae.AppError                   // init pointer to error
 
 	switch route {
 	case "createArtist":
@@ -57,6 +56,7 @@ func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
+	// @todo can probably combine this and rely on interfaces to do the work
 	if err != nil {
 		utils.JsonResponse(w, err.GetCode(), err)
 	} else {
@@ -65,8 +65,10 @@ func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
+	// fetch and parse sort params
 	sort, e := utils.FetchSortParams(r, "name", 1)
 	if e != nil {
+		// throw error if invalid format
 		return nil, ae.MakeError(ae.ERRBadRequest, e)
 	}
 
@@ -80,6 +82,7 @@ func (s *Handler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
 }
 
 func (s *Handler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
+	// fetch and parse ID from URL
 	idb := mux.Vars(r)["id"]
 	id, e := uuid.Parse(idb)
 	if e != nil {
@@ -87,10 +90,10 @@ func (s *Handler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
 		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid ID")
 	}
 
+	// init artist pointer
 	var artist *domain.Artist
 	artist, err := s.svc.GetArtist(id)
 	if err != nil {
-		fmt.Println("sss")
 		return nil, err
 	}
 
@@ -100,6 +103,7 @@ func (s *Handler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
 func (s *Handler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
 	var a *domain.Artist
 
+	// attempt to unmarshal request body into artist struct
 	err := json.NewDecoder(r.Body).Decode(&a)
 	if err != nil {
 		log.Error(err)
@@ -114,6 +118,7 @@ func (s *Handler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
 }
 
 func (s *Handler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
+	// fetch and parse id from url
 	var a *domain.Artist
 	idb := mux.Vars(r)["id"]
 	id, err := uuid.Parse(idb)
@@ -121,6 +126,7 @@ func (s *Handler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
 		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid ID")
 	}
 
+	// attempt to unmarshal request body into artist struct
 	err = json.NewDecoder(r.Body).Decode(&a)
 	if err != nil {
 		log.Error(err)
@@ -128,13 +134,14 @@ func (s *Handler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
 	}
 
 	if err := s.svc.UpdateArtist(a, id); err != nil {
-		return nil, ae.MakeError(ae.ERRBadRequest, err)
+		return nil, err
 	}
 
 	return a, nil
 }
 
 func (s *Handler) deleteArtist(r *http.Request) (interface{}, *ae.AppError) {
+	// fetch and parse id from url
 	idb := mux.Vars(r)["id"]
 	id, e := uuid.Parse(idb)
 	if e != nil {
@@ -143,7 +150,7 @@ func (s *Handler) deleteArtist(r *http.Request) (interface{}, *ae.AppError) {
 
 	artist, err := s.svc.DeleteArtist(id)
 	if err != nil {
-		return nil, ae.MakeError(ae.ERRBadRequest, err)
+		return nil, err
 	}
 
 	return artist, nil

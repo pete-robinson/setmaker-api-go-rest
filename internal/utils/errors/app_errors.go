@@ -9,6 +9,7 @@ type AppError struct {
 	BaseError
 }
 
+// IOTA for supported error types
 const (
 	ERRBadRequest = iota
 	ERRUnauthorized
@@ -17,6 +18,7 @@ const (
 	ERRInternalServerError
 )
 
+// error strints - mapped to IOTA sequence above
 var errorStrings = map[int]string{
 	ERRBadRequest:          "Bad Request",
 	ERRUnauthorized:        "Unauthorized",
@@ -27,6 +29,7 @@ var errorStrings = map[int]string{
 
 // @todo - map Code back to http status codes
 func MakeError(errRef int, message interface{}) *AppError {
+	// base error obj
 	base := BaseError{
 		Code: http.StatusBadRequest,
 		Payload: ErrorPayload{
