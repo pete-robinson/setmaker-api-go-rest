@@ -14,19 +14,23 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Handler struct {
+type Handler interface {
+	HandleRoutes(w http.ResponseWriter, r *http.Request)
+}
+
+type ArtistsHandler struct {
 	svc *services.ArtistService
 }
 
 type ArtistsList []*domain.Artist
 
-func NewArtistsHandler(svc *services.ArtistService) *Handler {
-	return &Handler{
+func NewArtistsHandler(svc *services.ArtistService) *ArtistsHandler {
+	return &ArtistsHandler{
 		svc: svc,
 	}
 }
 
-func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
+func (s *ArtistsHandler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 	route := mux.CurrentRoute(r).GetName() // current requested route
 	var successCode int                    // init success code
 	var resp interface{}                   // init response interface
@@ -64,7 +68,7 @@ func (s *Handler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Handler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
+func (s *ArtistsHandler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
 	// fetch and parse sort params
 	sort, e := utils.FetchSortParams(r, "name", 1)
 	if e != nil {
@@ -81,7 +85,7 @@ func (s *Handler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
 	return artists, nil
 }
 
-func (s *Handler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
+func (s *ArtistsHandler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
 	// fetch and parse ID from URL
 	idb := mux.Vars(r)["id"]
 	id, e := uuid.Parse(idb)
@@ -100,7 +104,7 @@ func (s *Handler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
 	return artist, nil
 }
 
-func (s *Handler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
+func (s *ArtistsHandler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
 	var a *domain.Artist
 
 	// attempt to unmarshal request body into artist struct
@@ -117,7 +121,7 @@ func (s *Handler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
 	return a, nil
 }
 
-func (s *Handler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
+func (s *ArtistsHandler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
 	// fetch and parse id from url
 	var a *domain.Artist
 	idb := mux.Vars(r)["id"]
@@ -140,7 +144,7 @@ func (s *Handler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
 	return a, nil
 }
 
-func (s *Handler) deleteArtist(r *http.Request) (interface{}, *ae.AppError) {
+func (s *ArtistsHandler) deleteArtist(r *http.Request) (interface{}, *ae.AppError) {
 	// fetch and parse id from url
 	idb := mux.Vars(r)["id"]
 	id, e := uuid.Parse(idb)

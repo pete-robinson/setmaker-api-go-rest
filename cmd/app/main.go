@@ -26,13 +26,16 @@ func main() {
 
 	// register repository
 	artistsRepository := repository.NewArtistsRepository(db)
+	songsRepository := repository.NewSongsRepository(db)
 
 	// register services
 	artistsService := services.NewArtistsService(artistsRepository)
+	songsService := services.NewSongsService(songsRepository)
 
 	// register controllers
 	controllers := map[string]router.RouteHandler{
 		"artists": handlers.NewArtistsHandler(artistsService),
+		"songs":   handlers.NewSongsHandler(songsService),
 	}
 
 	// build the router

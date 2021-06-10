@@ -27,6 +27,7 @@ func (mc *ConnectionDto) GetDsn() string {
 	builder.WriteString("?retryWrites=true&w=majority")
 
 	result := builder.String()
+	fmt.Println(result)
 	return result
 }
 

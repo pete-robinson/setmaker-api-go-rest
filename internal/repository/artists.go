@@ -16,29 +16,30 @@ import (
 	"github.com/google/uuid"
 )
 
-const Table = "artists"
+const artistsTable = "artists"
 
-// type ArtistsRepository interface {
-// 	Get(id uuid.UUID) (*domain.Artist, error)
-// 	Find(filter utils.QuerySort) ([]*domain.Artist, error)
-// 	Create(*domain.Artist) error
-// 	// Update(*domain.Artist) error
-// 	// Delete(*domain.Artist) error
-// }
+type ArtistsRepository interface {
+	Get(id uuid.UUID) (*domain.Artist, error)
+	Find(filter *utils.QuerySort) ([]*domain.Artist, error)
+	Create(*domain.Artist) error
+	Count(...utils.FieldSearch) (int64, error)
+	Update(*domain.Artist) error
+	Delete(*domain.Artist) error
+}
 
-type ArtistsRepository struct {
+type artistsRepository struct {
 	table string
 	db    *mongo.Database
 }
 
-func NewArtistsRepository(db *mongo.Database) *ArtistsRepository {
-	return &ArtistsRepository{
-		table: Table,
+func NewArtistsRepository(db *mongo.Database) *artistsRepository {
+	return &artistsRepository{
+		table: artistsTable,
 		db:    db,
 	}
 }
 
-func (r *ArtistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
+func (r *artistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
 	var a *domain.Artist
 	ctx := context.Background()
 
@@ -46,8 +47,9 @@ func (r *ArtistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
 	found := r.db.Collection(r.table).FindOne(ctx, bson.M{"_id": id})
 	if found == nil {
 		// no artist found
-		log.Error(fmt.Sprintf("Artist %q not found", id))
-		return nil, errors.New(fmt.Sprintf("Artist not found: %q", id))
+		msg := fmt.Sprintf("Artist %q not found", id)
+		log.Error(msg)
+		return nil, errors.New(msg)
 	}
 
 	// attempt to decude result into Artist struct
@@ -60,7 +62,7 @@ func (r *ArtistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
 	return a, nil
 }
 
-func (r *ArtistsRepository) Find(filter *utils.QuerySort) ([]*domain.Artist, error) {
+func (r *artistsRepository) Find(filter *utils.QuerySort) ([]*domain.Artist, error) {
 	// init result slice
 	artists := make([]*domain.Artist, 0)
 	ctx := context.Background()
@@ -95,7 +97,7 @@ func (r *ArtistsRepository) Find(filter *utils.QuerySort) ([]*domain.Artist, err
 	return artists, nil
 }
 
-func (r *ArtistsRepository) Count(queries ...utils.FieldSearch) (int64, error) {
+func (r *artistsRepository) Count(queries ...utils.FieldSearch) (int64, error) {
 	ctx := context.Background()
 	// init filters
 	filters := make([]bson.M, 0)
@@ -112,7 +114,7 @@ func (r *ArtistsRepository) Count(queries ...utils.FieldSearch) (int64, error) {
 	return count, err
 }
 
-func (r *ArtistsRepository) Create(a *domain.Artist) error {
+func (r *artistsRepository) Create(a *domain.Artist) error {
 	ctx := context.Background()
 
 	// spawn new UUID
@@ -122,7 +124,7 @@ func (r *ArtistsRepository) Create(a *domain.Artist) error {
 	return err
 }
 
-func (r *ArtistsRepository) Update(a *domain.Artist) error {
+func (r *artistsRepository) Update(a *domain.Artist) error {
 	ctx := context.Background()
 
 	// create bson update query
@@ -138,7 +140,7 @@ func (r *ArtistsRepository) Update(a *domain.Artist) error {
 	return err
 }
 
-func (r *ArtistsRepository) Delete(a *domain.Artist) error {
+func (r *artistsRepository) Delete(a *domain.Artist) error {
 	ctx := context.Background()
 
 	_, err := r.db.Collection(r.table).DeleteOne(ctx, bson.M{"_id": a.ID})

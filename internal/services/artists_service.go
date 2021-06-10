@@ -14,18 +14,24 @@ import (
 	"github.com/google/uuid"
 )
 
+const MaxSlugIncrement = 20
+
 type ArtistService struct {
-	repository *repository.ArtistsRepository
+	repository repository.ArtistsRepository
 }
 
-type ValidatorResponse map[string][]string
-
-func NewArtistsService(r *repository.ArtistsRepository) *ArtistService {
+// Creates a new artist service
+func NewArtistsService(r repository.ArtistsRepository) *ArtistService {
 	return &ArtistService{
 		repository: r,
 	}
 }
 
+func (svc *ArtistService) getRepository() repository.ArtistsRepository {
+	return svc.repository
+}
+
+// Fetch artists
 func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, *ae.AppError) {
 	res, err := svc.repository.Find(filter)
 	if err != nil {
@@ -39,6 +45,7 @@ func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist,
 	return nil, ae.MakeError(ae.ERRNotFound, "No artists found")
 }
 
+// get single artist
 func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
 	artist, err := svc.repository.Get(id)
 	if err != nil {
@@ -48,6 +55,7 @@ func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, *ae.AppError)
 	return artist, nil
 }
 
+// Create artist
 func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
 	// create unique slug
 	err := svc.uniqueSlug(artist)
@@ -72,6 +80,7 @@ func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
 	return nil
 }
 
+// Update artist
 func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppError {
 	// check the original artist actually exists
 	originalArtist, err := svc.GetArtist(id)
@@ -106,6 +115,7 @@ func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppEr
 	return nil
 }
 
+// Delete artist
 func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
 	// check the artist exists
 	artist, err := svc.GetArtist(id)
@@ -122,10 +132,13 @@ func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, *ae.AppErr
 	return artist, nil
 }
 
+// Generate a unique slug from the artist name
+// will query DB to evaluate uniqueness and append an incrementing number if a dupe exists
+// incremented number has a max value of const MaxSlugIncrement
 func (svc *ArtistService) uniqueSlug(a *domain.Artist) error {
 	// loop through up to n times to create a unique slug
 	var s string
-	for i := 0; i < 20; i++ {
+	for i := 0; i < MaxSlugIncrement; i++ {
 		if i == 0 {
 			s = a.CreateSlug("")
 		} else {
