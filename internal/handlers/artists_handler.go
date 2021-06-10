@@ -14,10 +14,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Handler interface {
-	HandleRoutes(w http.ResponseWriter, r *http.Request)
-}
-
 type ArtistsHandler struct {
 	svc *services.ArtistService
 }
