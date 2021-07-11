@@ -25,14 +25,16 @@ func (a *BaseError) GetCode() int {
 
 func (a *BaseError) GetMessage() (interface{}, error) {
 	if (ErrorPayload{}) == a.Payload {
-		return "", errors.New("Error payload not found")
+		return nil, errors.New("Error payload not found")
 	}
 
 	return a.Payload.Message, nil
 }
 
-// @todo deal with how Message is handled
-// json won't unmarshall a type interface{}...
+/**
+ * @todo deal with how Message is handled
+ * json won't unmarshall a type interface{}...
+ */
 func (a *BaseError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		Code    int         `json:"status"`

@@ -31,6 +31,9 @@ func BuildRouter(controllers map[string]RouteHandler) *mux.Router {
 	sr := v1r.PathPrefix("/songs").Subrouter()
 	sr.HandleFunc("/", controllers["songs"].HandleRoutes).Methods(http.MethodPost).Name("createSong")
 	sr.HandleFunc("/{id}", controllers["songs"].HandleRoutes).Methods(http.MethodGet).Name("getSong")
+	sr.HandleFunc("/{id}", controllers["songs"].HandleRoutes).Methods(http.MethodPut).Name("updateSong")
+	sr.HandleFunc("/artist/{id}", controllers["songs"].HandleRoutes).Methods(http.MethodGet).Name("getSongsByArtist")
+	sr.HandleFunc("/{id}", controllers["songs"].HandleRoutes).Methods(http.MethodDelete).Name("deleteSong")
 
 	return r
 }

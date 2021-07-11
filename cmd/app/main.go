@@ -1,16 +1,15 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 
 	mdb "setmaker-api-go-rest/internal/database"
-	"setmaker-api-go-rest/internal/handlers"
+	handlers "setmaker-api-go-rest/internal/handlers/http"
 	"setmaker-api-go-rest/internal/repository"
 	"setmaker-api-go-rest/internal/router"
 	"setmaker-api-go-rest/internal/services"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/joho/godotenv"
 )
@@ -30,18 +29,18 @@ func main() {
 
 	// register services
 	artistsService := services.NewArtistsService(artistsRepository)
-	songsService := services.NewSongsService(songsRepository)
+	songsService := services.NewSongsService(songsRepository, artistsService)
 
-	// register controllers
+	// // register controllers
 	controllers := map[string]router.RouteHandler{
 		"artists": handlers.NewArtistsHandler(artistsService),
 		"songs":   handlers.NewSongsHandler(songsService),
 	}
 
-	// build the router
+	// // build the router
 	r := router.BuildRouter(controllers)
 
-	// start the server
+	// // start the server
 	log.Fatal(http.ListenAndServe(":8080", r))
 
 }

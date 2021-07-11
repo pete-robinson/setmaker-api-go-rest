@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"setmaker-api-go-rest/internal/domain"
@@ -14,26 +15,34 @@ import (
 	"github.com/google/uuid"
 )
 
-const MaxSlugIncrement = 20
+const MaxSlugIncrement = 10
 
-type ArtistService struct {
+type ArtistService interface {
+	GetArtists(context.Context, *utils.QuerySort) ([]*domain.Artist, *ae.AppError)
+	GetArtist(context.Context, uuid.UUID) (*domain.Artist, *ae.AppError)
+	CreateArtist(context.Context, *domain.Artist) *ae.AppError
+	UpdateArtist(context.Context, *domain.Artist, uuid.UUID) *ae.AppError
+	DeleteArtist(context.Context, uuid.UUID) (*domain.Artist, *ae.AppError)
+}
+
+type artistService struct {
 	repository repository.ArtistsRepository
 }
 
-// Creates a new artist service
-func NewArtistsService(r repository.ArtistsRepository) *ArtistService {
-	return &ArtistService{
+/**
+ * instantiate new service
+ */
+func NewArtistsService(r repository.ArtistsRepository) *artistService {
+	return &artistService{
 		repository: r,
 	}
 }
 
-func (svc *ArtistService) getRepository() repository.ArtistsRepository {
-	return svc.repository
-}
-
-// Fetch artists
-func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist, *ae.AppError) {
-	res, err := svc.repository.Find(filter)
+/**
+ * Get a list of artists
+ */
+func (svc *artistService) GetArtists(ctx context.Context, filter *utils.QuerySort) ([]*domain.Artist, *ae.AppError) {
+	res, err := svc.repository.Find(ctx, filter)
 	if err != nil {
 		return nil, ae.MakeError(ae.ERRInternalServerError, "Error fetching artists")
 	}
@@ -45,9 +54,11 @@ func (svc *ArtistService) GetArtists(filter *utils.QuerySort) ([]*domain.Artist,
 	return nil, ae.MakeError(ae.ERRNotFound, "No artists found")
 }
 
-// get single artist
-func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
-	artist, err := svc.repository.Get(id)
+/**
+ * Get a single artist by ID
+ */
+func (svc *artistService) GetArtist(ctx context.Context, id uuid.UUID) (*domain.Artist, *ae.AppError) {
+	artist, err := svc.repository.GetById(ctx, id)
 	if err != nil {
 		return nil, ae.MakeError(ae.ERRNotFound, err.Error())
 	}
@@ -55,10 +66,12 @@ func (svc *ArtistService) GetArtist(id uuid.UUID) (*domain.Artist, *ae.AppError)
 	return artist, nil
 }
 
-// Create artist
-func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
+/**
+ * Create a new artist
+ */
+func (svc *artistService) CreateArtist(ctx context.Context, artist *domain.Artist) *ae.AppError {
 	// create unique slug
-	err := svc.uniqueSlug(artist)
+	err := svc.uniqueSlug(ctx, artist)
 	if err != nil {
 		log.Error("Error generating URL slug")
 		return ae.MakeError(ae.ERRInternalServerError, "Could not create artist path")
@@ -70,8 +83,11 @@ func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
 		return ae.MakeError(ae.ERRBadRequest, errStr) // hacky but it'll do until i build a more robust error abstraction
 	}
 
+	// spawn new UUID
+	artist.ID = uuid.New()
+
 	// create artist
-	err = svc.repository.Create(artist)
+	err = svc.repository.Create(ctx, artist)
 	if err != nil {
 		log.Error("Mongo error:", err)
 		return ae.MakeError(ae.ERRInternalServerError, "Could not create artist")
@@ -80,10 +96,12 @@ func (svc *ArtistService) CreateArtist(artist *domain.Artist) *ae.AppError {
 	return nil
 }
 
-// Update artist
-func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppError {
+/**
+ * Update an artist
+ */
+func (svc *artistService) UpdateArtist(ctx context.Context, a *domain.Artist, id uuid.UUID) *ae.AppError {
 	// check the original artist actually exists
-	originalArtist, err := svc.GetArtist(id)
+	originalArtist, err := svc.GetArtist(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -92,7 +110,7 @@ func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppEr
 
 	// if name is different, the slug will need to changes
 	if a.Name != originalArtist.Name {
-		err := svc.uniqueSlug(a)
+		err := svc.uniqueSlug(ctx, a)
 		if err != nil {
 			return ae.MakeError(ae.ERRInternalServerError, "Could not create artist path")
 		}
@@ -107,7 +125,7 @@ func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppEr
 		return ae.MakeError(ae.ERRBadRequest, errStr)
 	}
 
-	e := svc.repository.Update(a)
+	e := svc.repository.Update(ctx, a)
 	if e != nil {
 		return ae.MakeError(ae.ERRBadRequest, fmt.Sprintf("Error persisting artist update: %q", id))
 	}
@@ -115,16 +133,18 @@ func (svc *ArtistService) UpdateArtist(a *domain.Artist, id uuid.UUID) *ae.AppEr
 	return nil
 }
 
-// Delete artist
-func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, *ae.AppError) {
+/**
+ * Delete an artist
+ */
+func (svc *artistService) DeleteArtist(ctx context.Context, id uuid.UUID) (*domain.Artist, *ae.AppError) {
 	// check the artist exists
-	artist, err := svc.GetArtist(id)
+	artist, err := svc.GetArtist(ctx, id)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	e := svc.repository.Delete(artist)
+	e := svc.repository.Delete(ctx, artist)
 	if e != nil {
 		return nil, ae.MakeError(ae.ERRInternalServerError, fmt.Sprintf("Artist could not be deleted: %q", id))
 	}
@@ -132,10 +152,12 @@ func (svc *ArtistService) DeleteArtist(id uuid.UUID) (*domain.Artist, *ae.AppErr
 	return artist, nil
 }
 
-// Generate a unique slug from the artist name
-// will query DB to evaluate uniqueness and append an incrementing number if a dupe exists
-// incremented number has a max value of const MaxSlugIncrement
-func (svc *ArtistService) uniqueSlug(a *domain.Artist) error {
+/**
+ * Generate a unique slug from the artist name
+ * will query DB to evaluate uniqueness and append an incrementing number if a dupe exists
+ * incremented number has a max value of const MaxSlugIncrement
+ */
+func (svc *artistService) uniqueSlug(ctx context.Context, a *domain.Artist) error {
 	// loop through up to n times to create a unique slug
 	var s string
 	for i := 0; i < MaxSlugIncrement; i++ {
@@ -152,7 +174,7 @@ func (svc *ArtistService) uniqueSlug(a *domain.Artist) error {
 			Query: s,
 		}
 
-		count, err := svc.repository.Count(fs)
+		count, err := svc.repository.Count(ctx, fs)
 		if err != nil {
 			return err
 		}

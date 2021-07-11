@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"setmaker-api-go-rest/internal/domain"
@@ -14,42 +15,58 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type ArtistsHandler struct {
-	svc *services.ArtistService
+type artistsHandler struct {
+	svc services.ArtistService
 }
 
 type ArtistsList []*domain.Artist
 
-func NewArtistsHandler(svc *services.ArtistService) *ArtistsHandler {
-	return &ArtistsHandler{
+const (
+	routeCreateArtist = "createArtist"
+	routeGetArtists   = "getArtists"
+	routeGetArtist    = "getArtist"
+	routeUpdateArtist = "updateArtist"
+	routeDeleteArtist = "deleteArtist"
+)
+
+/**
+ * Instantiate new service
+ */
+func NewArtistsHandler(svc services.ArtistService) *artistsHandler {
+	return &artistsHandler{
 		svc: svc,
 	}
 }
 
-func (s *ArtistsHandler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
+/**
+ * Handle inbound HTTP routes
+ */
+func (s *artistsHandler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	route := mux.CurrentRoute(r).GetName() // current requested route
 	var successCode int                    // init success code
 	var resp interface{}                   // init response interface
-	var err *ae.AppError                   // init pointer to error
+	var err *ae.AppError                   // init error
 
 	switch route {
-	case "createArtist":
-		resp, err = s.createArtist(r)
+	case routeCreateArtist:
+		resp, err = s.createArtist(ctx, r)
 		successCode = 201
 		break
-	case "getArtists":
-		resp, err = s.getArtists(r)
+	case routeGetArtists:
+		resp, err = s.getArtists(ctx, r)
 		successCode = 200
 		break
-	case "getArtist":
-		resp, err = s.getArtist(r)
+	case routeGetArtist:
+		resp, err = s.getArtist(ctx, r)
 		successCode = 200
 		break
-	case "updateArtist":
-		resp, err = s.updateArtist(r)
+	case routeUpdateArtist:
+		resp, err = s.updateArtist(ctx, r)
 		successCode = 200
-	case "deleteArtist":
-		resp, err = s.deleteArtist(r)
+	case routeDeleteArtist:
+		resp, err = s.deleteArtist(ctx, r)
 		successCode = 200
 	default:
 		err = ae.MakeError(ae.ERRNotFound, "Route not found")
@@ -64,7 +81,10 @@ func (s *ArtistsHandler) HandleRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *ArtistsHandler) getArtists(r *http.Request) (interface{}, *ae.AppError) {
+/**
+ * get a list of artists
+ */
+func (s *artistsHandler) getArtists(ctx context.Context, r *http.Request) ([]*domain.Artist, *ae.AppError) {
 	// fetch and parse sort params
 	sort, e := utils.FetchSortParams(r, "name", 1)
 	if e != nil {
@@ -72,7 +92,7 @@ func (s *ArtistsHandler) getArtists(r *http.Request) (interface{}, *ae.AppError)
 		return nil, ae.MakeError(ae.ERRBadRequest, e)
 	}
 
-	artists, err := s.svc.GetArtists(sort)
+	artists, err := s.svc.GetArtists(ctx, sort)
 	if err != nil {
 		log.Error(err)
 		return nil, ae.MakeError(ae.ERRBadRequest, err)
@@ -81,7 +101,10 @@ func (s *ArtistsHandler) getArtists(r *http.Request) (interface{}, *ae.AppError)
 	return artists, nil
 }
 
-func (s *ArtistsHandler) getArtist(r *http.Request) (interface{}, *ae.AppError) {
+/**
+ * Get single artist by ID
+ */
+func (s *artistsHandler) getArtist(ctx context.Context, r *http.Request) (*domain.Artist, *ae.AppError) {
 	// fetch and parse ID from URL
 	idb := mux.Vars(r)["id"]
 	id, e := uuid.Parse(idb)
@@ -92,7 +115,7 @@ func (s *ArtistsHandler) getArtist(r *http.Request) (interface{}, *ae.AppError) 
 
 	// init artist pointer
 	var artist *domain.Artist
-	artist, err := s.svc.GetArtist(id)
+	artist, err := s.svc.GetArtist(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +123,10 @@ func (s *ArtistsHandler) getArtist(r *http.Request) (interface{}, *ae.AppError) 
 	return artist, nil
 }
 
-func (s *ArtistsHandler) createArtist(r *http.Request) (interface{}, *ae.AppError) {
+/**
+ * Create a new artist
+ */
+func (s *artistsHandler) createArtist(ctx context.Context, r *http.Request) (*domain.Artist, *ae.AppError) {
 	var a *domain.Artist
 
 	// attempt to unmarshal request body into artist struct
@@ -110,14 +136,17 @@ func (s *ArtistsHandler) createArtist(r *http.Request) (interface{}, *ae.AppErro
 		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid request body")
 	}
 
-	if err := s.svc.CreateArtist(a); err != nil {
+	if err := s.svc.CreateArtist(ctx, a); err != nil {
 		return nil, ae.MakeError(ae.ERRBadRequest, err)
 	}
 
 	return a, nil
 }
 
-func (s *ArtistsHandler) updateArtist(r *http.Request) (interface{}, *ae.AppError) {
+/**
+ * Update existing artist
+ */
+func (s *artistsHandler) updateArtist(ctx context.Context, r *http.Request) (*domain.Artist, *ae.AppError) {
 	// fetch and parse id from url
 	var a *domain.Artist
 	idb := mux.Vars(r)["id"]
@@ -133,14 +162,17 @@ func (s *ArtistsHandler) updateArtist(r *http.Request) (interface{}, *ae.AppErro
 		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid request body")
 	}
 
-	if err := s.svc.UpdateArtist(a, id); err != nil {
+	if err := s.svc.UpdateArtist(ctx, a, id); err != nil {
 		return nil, err
 	}
 
 	return a, nil
 }
 
-func (s *ArtistsHandler) deleteArtist(r *http.Request) (interface{}, *ae.AppError) {
+/**
+ * Delete an artist
+ */
+func (s *artistsHandler) deleteArtist(ctx context.Context, r *http.Request) (*domain.Artist, *ae.AppError) {
 	// fetch and parse id from url
 	idb := mux.Vars(r)["id"]
 	id, e := uuid.Parse(idb)
@@ -148,7 +180,7 @@ func (s *ArtistsHandler) deleteArtist(r *http.Request) (interface{}, *ae.AppErro
 		return nil, ae.MakeError(ae.ERRBadRequest, "Invalid ID")
 	}
 
-	artist, err := s.svc.DeleteArtist(id)
+	artist, err := s.svc.DeleteArtist(ctx, id)
 	if err != nil {
 		return nil, err
 	}

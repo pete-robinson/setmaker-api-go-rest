@@ -19,12 +19,12 @@ import (
 const artistsTable = "artists"
 
 type ArtistsRepository interface {
-	Get(id uuid.UUID) (*domain.Artist, error)
-	Find(filter *utils.QuerySort) ([]*domain.Artist, error)
-	Create(*domain.Artist) error
-	Count(...utils.FieldSearch) (int64, error)
-	Update(*domain.Artist) error
-	Delete(*domain.Artist) error
+	GetById(context.Context, uuid.UUID) (*domain.Artist, error)
+	Find(context.Context, *utils.QuerySort) ([]*domain.Artist, error)
+	Create(context.Context, *domain.Artist) error
+	Count(context.Context, ...utils.FieldSearch) (int64, error)
+	Update(context.Context, *domain.Artist) error
+	Delete(context.Context, *domain.Artist) error
 }
 
 type artistsRepository struct {
@@ -32,6 +32,9 @@ type artistsRepository struct {
 	db    *mongo.Database
 }
 
+/**
+ * create a new repository
+ */
 func NewArtistsRepository(db *mongo.Database) *artistsRepository {
 	return &artistsRepository{
 		table: artistsTable,
@@ -39,9 +42,11 @@ func NewArtistsRepository(db *mongo.Database) *artistsRepository {
 	}
 }
 
-func (r *artistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
+/**
+ * Get a single artist by ID
+ */
+func (r *artistsRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Artist, error) {
 	var a *domain.Artist
-	ctx := context.Background()
 
 	// find single artist
 	found := r.db.Collection(r.table).FindOne(ctx, bson.M{"_id": id})
@@ -62,10 +67,12 @@ func (r *artistsRepository) Get(id uuid.UUID) (*domain.Artist, error) {
 	return a, nil
 }
 
-func (r *artistsRepository) Find(filter *utils.QuerySort) ([]*domain.Artist, error) {
+/**
+ * Find an artist based on a filter
+ */
+func (r *artistsRepository) Find(ctx context.Context, filter *utils.QuerySort) ([]*domain.Artist, error) {
 	// init result slice
 	artists := make([]*domain.Artist, 0)
-	ctx := context.Background()
 
 	// filter options
 	opts := options.Find()
@@ -90,15 +97,17 @@ func (r *artistsRepository) Find(filter *utils.QuerySort) ([]*domain.Artist, err
 			log.Error(err)
 			return artists, err
 		}
-
+		// append result to artists slice
 		artists = append(artists, a)
 	}
 
 	return artists, nil
 }
 
-func (r *artistsRepository) Count(queries ...utils.FieldSearch) (int64, error) {
-	ctx := context.Background()
+/**
+ * Fetch count of artists based on a filter
+ */
+func (r *artistsRepository) Count(ctx context.Context, queries ...utils.FieldSearch) (int64, error) {
 	// init filters
 	filters := make([]bson.M, 0)
 
@@ -114,19 +123,18 @@ func (r *artistsRepository) Count(queries ...utils.FieldSearch) (int64, error) {
 	return count, err
 }
 
-func (r *artistsRepository) Create(a *domain.Artist) error {
-	ctx := context.Background()
-
-	// spawn new UUID
-	a.ID = uuid.New()
-	// create
+/**
+ * Create a new artist
+ */
+func (r *artistsRepository) Create(ctx context.Context, a *domain.Artist) error {
 	_, err := r.db.Collection(r.table).InsertOne(ctx, a)
 	return err
 }
 
-func (r *artistsRepository) Update(a *domain.Artist) error {
-	ctx := context.Background()
-
+/**
+ * Update an existing artist
+ */
+func (r *artistsRepository) Update(ctx context.Context, a *domain.Artist) error {
 	// create bson update query
 	update := bson.M{
 		"$set": bson.M{
@@ -140,9 +148,10 @@ func (r *artistsRepository) Update(a *domain.Artist) error {
 	return err
 }
 
-func (r *artistsRepository) Delete(a *domain.Artist) error {
-	ctx := context.Background()
-
+/**
+ * Delete an existing artist
+ */
+func (r *artistsRepository) Delete(ctx context.Context, a *domain.Artist) error {
 	_, err := r.db.Collection(r.table).DeleteOne(ctx, bson.M{"_id": a.ID})
 	return err
 }
