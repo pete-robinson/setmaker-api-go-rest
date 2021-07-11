@@ -24,7 +24,9 @@ type songService struct {
 	as         ArtistService
 }
 
-// create a new song service
+/**
+ * create a new song service
+ */
 func NewSongsService(r repository.SongsRepository, as ArtistService) *songService {
 	return &songService{
 		repository: r,
@@ -32,6 +34,9 @@ func NewSongsService(r repository.SongsRepository, as ArtistService) *songServic
 	}
 }
 
+/**
+ * Get songs by artist id
+ */
 func (svc *songService) GetSongsByArtistId(ctx context.Context, id uuid.UUID) ([]*domain.Song, *ae.AppError) {
 	// validate artist exists
 	if _, err := svc.as.GetArtist(ctx, id); err != nil {
@@ -47,7 +52,9 @@ func (svc *songService) GetSongsByArtistId(ctx context.Context, id uuid.UUID) ([
 	return results, nil
 }
 
-// Get song
+/**
+ * Get a single Song
+ */
 func (svc *songService) GetSong(ctx context.Context, id uuid.UUID) (*domain.Song, *ae.AppError) {
 	song, err := svc.repository.GetById(ctx, id)
 	if err != nil {
@@ -57,7 +64,9 @@ func (svc *songService) GetSong(ctx context.Context, id uuid.UUID) (*domain.Song
 	return song, nil
 }
 
-// Create Song
+/**
+ * Create new song
+ */
 func (svc *songService) CreateSong(ctx context.Context, song *domain.Song) *ae.AppError {
 	// validate
 	if errStr := song.Validate(); len(errStr) > 0 {
@@ -75,6 +84,9 @@ func (svc *songService) CreateSong(ctx context.Context, song *domain.Song) *ae.A
 	return nil
 }
 
+/**
+ * update Song
+ */
 func (svc *songService) UpdateSong(ctx context.Context, s *domain.Song, id uuid.UUID) *ae.AppError {
 	_, err := svc.GetSong(ctx, id)
 	if err != nil {
@@ -96,6 +108,9 @@ func (svc *songService) UpdateSong(ctx context.Context, s *domain.Song, id uuid.
 	return nil
 }
 
+/**
+ * Delete a song
+ */
 func (svc *songService) DeleteSong(ctx context.Context, id uuid.UUID) (*domain.Song, *ae.AppError) {
 	// check the song exists
 	song, err := svc.GetSong(ctx, id)

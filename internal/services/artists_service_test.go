@@ -13,13 +13,13 @@ import (
 
 func TestUniqueSlug(t *testing.T) {
 	tests := []struct {
-		testName     string
-		name         string
-		initialSlugs []string
-		expSlug      string
-		count        int64
-		expErr       error
-		dbError      error
+		testName     string   // name of the test
+		name         string   // name of the artist to create
+		initialSlugs []string // slugs that'll be queried as part of the creation (for mock obj)
+		expSlug      string   // the expected final slug
+		count        int64    // the number of results returned by the DB
+		expErr       error    // expected error from func
+		dbError      error    // expected DB error (testing for handling of DB errors)
 	}{
 		{
 			testName:     "Test a standard string",

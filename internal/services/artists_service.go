@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const MaxSlugIncrement = 10
+const maxSlugIncrement = 10
 
 type ArtistService interface {
 	GetArtists(context.Context, *utils.QuerySort) ([]*domain.Artist, *ae.AppError)
@@ -155,12 +155,12 @@ func (svc *artistService) DeleteArtist(ctx context.Context, id uuid.UUID) (*doma
 /**
  * Generate a unique slug from the artist name
  * will query DB to evaluate uniqueness and append an incrementing number if a dupe exists
- * incremented number has a max value of const MaxSlugIncrement
+ * incremented number has a max value of const maxSlugIncrement
  */
 func (svc *artistService) uniqueSlug(ctx context.Context, a *domain.Artist) error {
 	// loop through up to n times to create a unique slug
 	var s string
-	for i := 0; i < MaxSlugIncrement; i++ {
+	for i := 0; i < maxSlugIncrement; i++ {
 		if i == 0 {
 			s = a.CreateSlug("")
 		} else {
